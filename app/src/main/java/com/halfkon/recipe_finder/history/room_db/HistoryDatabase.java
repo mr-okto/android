@@ -11,7 +11,7 @@ import com.halfkon.recipe_finder.history.HistoryRecordDao;
 /**
  * The Room database that contains the Users table
  */
-@Database(entities = {HistoryRecord.class}, version = 1)
+@Database(entities = {HistoryRecord.class}, version = 2)
 public abstract class HistoryDatabase extends RoomDatabase {
 
     private static volatile HistoryDatabase INSTANCE;

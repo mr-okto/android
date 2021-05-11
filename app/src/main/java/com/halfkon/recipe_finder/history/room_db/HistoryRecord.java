@@ -3,7 +3,6 @@ package com.halfkon.recipe_finder.history.room_db;
 
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
-import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 import androidx.annotation.NonNull;
 
@@ -15,7 +14,6 @@ public class HistoryRecord {
     @ColumnInfo(name = "recipeid")
     private Integer mRecipeId;
 
-    @NonNull
     @ColumnInfo(name = "dt", defaultValue = "(datetime('now'))")
     private String mDt;
 
