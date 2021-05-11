@@ -4,6 +4,10 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.halfkon.recipe_finder.ingredient.model.Ingredient;
+import com.halfkon.recipe_finder.ingredient_amount.network.IngredientAmountApiResponse;
+
+import java.util.List;
 import java.util.Objects;
 
 import okhttp3.HttpUrl;
@@ -13,8 +17,8 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.moshi.MoshiConverterFactory;
 
-public class IngredientApiRepoImpl implements IngredientApiRepo {
-    private static final String HOST = "api.spoonacular.com";
+public class IngredientApiRepoImpl implements com.halfkon.recipe_finder.ingredient.network.IngredientApiRepo {
+    private static final String HOST = "okto.pw";
     private final IngredientApi mIngredientApi;
 
     public IngredientApiRepoImpl() {
@@ -30,19 +34,23 @@ public class IngredientApiRepoImpl implements IngredientApiRepo {
     }
 
     @Override
-    public LiveData<IngredientApiResponse> getIngredients(String query) {
-        final MutableLiveData<IngredientApiResponse> liveData = new MutableLiveData<>();
-        Call<IngredientApi.Ingredients> call = mIngredientApi.getIngredients(query);
-        call.enqueue(new Callback<IngredientApi.Ingredients>() {
+    public LiveData<IngredientApiResponse> autocompleteIngredients(String query) {
+        final MutableLiveData<com.halfkon.recipe_finder.ingredient.network.IngredientApiResponse> liveData = new MutableLiveData<>();
+        Call<List<Ingredient>> call = mIngredientApi.autocompleteIngredients(query);
+        call.enqueue(new Callback<List<Ingredient>>() {
             @Override
-            public void onResponse(@NonNull Call<IngredientApi.Ingredients> call,
-                                   @NonNull Response<IngredientApi.Ingredients> response) {
-                liveData.setValue(
-                        new IngredientApiResponse(Objects.requireNonNull(response.body()).results));
+            public void onResponse(@NonNull Call<List<Ingredient>> call,
+                                   @NonNull Response<List<Ingredient>> response) {
+                if (response.body() == null) {
+                    liveData.setValue(new IngredientApiResponse(new Exception("Empty response body")));
+                } else {
+                    liveData.setValue(
+                            new IngredientApiResponse(response.body()));
+                }
             }
 
             @Override
-            public void onFailure(@NonNull Call<IngredientApi.Ingredients> call,
+            public void onFailure(@NonNull Call<List<Ingredient>> call,
                                   @NonNull Throwable t) {
                 liveData.setValue(new IngredientApiResponse(t));
             }

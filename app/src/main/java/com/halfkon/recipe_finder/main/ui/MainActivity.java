@@ -2,12 +2,14 @@ package com.halfkon.recipe_finder.main.ui;
 
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaCodec;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -15,99 +17,158 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.halfkon.recipe_finder.R;
-import com.halfkon.recipe_finder.article.ui.ArticleActivity;
-import com.halfkon.recipe_finder.article.ui.ArticleFragments.Models.InstructionModel;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.schedulers.Schedulers;
 
-import org.w3c.dom.Text;
+import com.bumptech.glide.Glide;
+import com.halfkon.recipe_finder.R;
+import com.halfkon.recipe_finder.history.Injection;
+import com.halfkon.recipe_finder.history.viewmodel.HistoryViewModel;
+import com.halfkon.recipe_finder.history.viewmodel.ViewModelFactory;
+import com.halfkon.recipe_finder.recipe.SharedPreferencesHandler;
+import com.halfkon.recipe_finder.recipe.model.Recipe;
+import com.halfkon.recipe_finder.recipe.ui.RecipesActivity;
+import com.halfkon.recipe_finder.recipe.viewmodel.RecipeViewModel;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    private final int HISTORY_ELEM_COUNT = 10;
+    private MainAdapter mAdapter;
+    private String mSearchQuery;
+    private HistoryViewModel mViewModel;
+    private final CompositeDisposable mDisposable = new CompositeDisposable();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        List<Model> list = new ArrayList<>();
-
-
-        String[] head = new String[]{"Pancake","Pancake","Pancake","Salad"};
-        String[] type = new String[]{"Breakfast · 15 mins","Breakfast · 15 mins","Breakfast · 15 mins","Breakfast · 15 mins","Breakfast · 15 mins"};
-        String[] image = new String[]{"","","",""};
-        boolean[] like = new boolean[]{true, false, true, false};
-        for (int i = 0; i < head.length; ++i ){
-            list.add(new Model(head[i], type[i], image[i], like[i]));
-        }
-
-
         RecyclerView recyclerView = findViewById(R.id.recycler);
         recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
-        recyclerView.setAdapter(new MainAdapter(list, this));
+        mAdapter = new MainAdapter(this);
+        recyclerView.setAdapter(mAdapter);
 
-        ImageButton home_btn = findViewById(R.id.home_btn);
-        ImageButton history_btn = findViewById(R.id.history_btn);
-        ImageButton likes_btn = findViewById(R.id.likes_btn);
-        ImageButton settings_btn = findViewById(R.id.settings_btn);
-
-        TextView hisory_btn_text = findViewById(R.id.history_btn_text);
-        TextView like_btn_text = findViewById(R.id.likes_btn_text);
-        TextView setting_btn_text = findViewById(R.id.settings_btn_text);
-
-        int textColor = getResources().getColor(R.color.green_active,  null);
-
-        home_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                home_btn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
+        RecipeViewModel recipeViewModel = new ViewModelProvider(this).get(RecipeViewModel.class);
+        recipeViewModel.getApiResponse().observe(this, apiResponse -> {
+            if (apiResponse.getError() != null) {
+                handleError(apiResponse.getError());
+            } else {
+                handleResponse(apiResponse.getRecipes());
             }
         });
 
-        history_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                history_btn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
-                history_btn.setBackgroundResource(R.drawable.ic_history_active);
-                hisory_btn_text.setTextColor(textColor);
+        recipeViewModel.searchRecipes(getString(R.string.mainPage));
+        ImageButton homeBtn = findViewById(R.id.home_btn);
+        ImageButton historyBtn = findViewById(R.id.history_btn);
+        ImageButton likesBtn = findViewById(R.id.likes_btn);
+        ImageButton settingsBtn = findViewById(R.id.settings_btn);
+        ImageButton searchBtn = findViewById(R.id.search_btn);
 
+        TextView historyBtnText = findViewById(R.id.history_btn_text);
+        TextView likeBtnText = findViewById(R.id.likes_btn_text);
+        TextView settingBtnText = findViewById(R.id.settings_btn_text);
+        EditText searchText = findViewById(R.id.search_field);
+
+        int activeColor = getResources().getColor(R.color.green_active,  null);
+        int inactiveColor = getResources().getColor(R.color.gray,  null);
+
+        mSearchQuery = getString(R.string.mainPage);
+
+        homeBtn.setOnClickListener(v -> {
+            homeBtn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
+            homeBtn.setBackgroundResource(R.drawable.ic_home_active);
+            historyBtn.setBackgroundResource(R.drawable.ic_history);
+            likesBtn.setBackgroundResource(R.drawable.ic_likes);
+            searchText.setText(mSearchQuery);
+            recipeViewModel.searchRecipes(mSearchQuery);
+        });
+
+        searchBtn.setOnClickListener(v -> {
+            mSearchQuery = searchText.getText().toString();
+            recipeViewModel.searchRecipes(mSearchQuery);
+            View view = getCurrentFocus();
+            if (view != null) {
+                // Hide keyboard
+                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
             }
         });
 
-        likes_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                likes_btn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
-                likes_btn.setBackgroundResource(R.drawable.ic_likes_active);
-                like_btn_text.setTextColor(textColor);
-            }
+
+        ViewModelFactory viewModelFactory = Injection.provideViewModelFactory(this);
+        mViewModel = new ViewModelProvider(this, viewModelFactory).get(HistoryViewModel.class);
+
+        historyBtn.setOnClickListener(v -> {
+            historyBtn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
+            historyBtn.setBackgroundResource(R.drawable.ic_history_active);
+            homeBtn.setBackgroundResource(R.drawable.ic_home);
+            likesBtn.setBackgroundResource(R.drawable.ic_likes);
+//            historyBtnText.setTextColor(activeColor);
+            mDisposable.add(mViewModel.getRecordIds(HISTORY_ELEM_COUNT)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(recipeViewModel::getRecipesBulk,
+                            throwable -> Log.e("Main Activity", "History gathering error", throwable)));
         });
 
-        settings_btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                settings_btn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
-                settings_btn.setBackgroundResource(R.drawable.ic_settings_active);
-                setting_btn_text.setTextColor(textColor);
-            }
+        likesBtn.setOnClickListener(v -> {
+            likesBtn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
+            likesBtn.setBackgroundResource(R.drawable.ic_likes_active);
+            homeBtn.setBackgroundResource(R.drawable.ic_home);
+            historyBtn.setBackgroundResource(R.drawable.ic_history);
+//            likeBtnText.setTextColor(activeColor);
+            List<String> ids = SharedPreferencesHandler.GetAllLikes(getBaseContext());
+            recipeViewModel.getRecipesBulk(ids);
         });
 
+        settingsBtn.setOnClickListener(v -> {
+            settingsBtn.startAnimation(AnimationUtils.loadAnimation(MainActivity.this, R.anim.scale_bg));
+//            settingsBtn.setBackgroundResource(R.drawable.ic_settings_active);
+//            settingBtnText.setTextColor(activeColor);
+        });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mAdapter.notifyDataSetChanged();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mDisposable.clear();
+    }
+
+    private void handleError(Throwable error) {
+        Log.e("Main Activity", "API error: " + error.toString());
+    }
+
+    private void handleResponse(List<Recipe> data) {
+        if (data != null && data.size() > 0) {
+            mAdapter.setItems(data);
+        } else {
+            mAdapter.clearItems();
+        }
+        mAdapter.notifyDataSetChanged();
     }
 }
 
 class MainAdapter extends RecyclerView.Adapter<MainViewHolder> {
 
-    List<Model> data;
-    public Context context;
+    List<Recipe> data;
+    public final Context context;
 
-    public MainAdapter(List<Model> list, Context context) {
-        data = list;
+    public MainAdapter(Context context) {
         this.context = context;
+        this.data = new ArrayList<>();
     }
 
     @NonNull
@@ -119,7 +180,7 @@ class MainAdapter extends RecyclerView.Adapter<MainViewHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull MainViewHolder holder, int position) {
-        Model model = data.get(position);
+        Recipe model = data.get(position);
         holder.bind(model);
     }
 
@@ -127,58 +188,79 @@ class MainAdapter extends RecyclerView.Adapter<MainViewHolder> {
     public int getItemCount() {
         return data.size();
     }
+
+    public void setItems(List<Recipe> recipes) {
+        data = recipes;
+    }
+
+    public void clearItems() {
+        data.clear();
+    }
 }
 class MainViewHolder extends RecyclerView.ViewHolder{
-    private final TextView head;
-    private final TextView type;
-    private final ImageView image;
-    private final ImageButton btn_like;
-    private final ImageView like;
-    public int btn_count = 1;
-    private final Context context;
-    public boolean heart;
+
+    private final TextView mHead;
+    private final TextView mType;
+    private final ImageView mImage;
+    private final ImageButton mBtnLike;
+    private final ImageView mLike;
+    private final RelativeLayout mRelativeLayout;
+    private final Context mContext;
 
     public MainViewHolder(@NonNull View itemView, Context context) {
         super(itemView);
-        this.context = context;
-        head = itemView.findViewById(R.id.recycler_headtext);
-        type = itemView.findViewById(R.id.recycler_type);
-        image = itemView.findViewById(R.id.recycler_image);
-        btn_like = itemView.findViewById(R.id.recycler_like);
-        like = itemView.findViewById(R.id.recycler_heart);
-        RelativeLayout relativeLayout = itemView.findViewById(R.id.main_item);
-        relativeLayout.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                context.startActivity(new Intent(context, ArticleActivity.class));
-            }
-        });
+        this.mContext = context;
+        mHead = itemView.findViewById(R.id.recycler_headtext);
+        mType = itemView.findViewById(R.id.recycler_type);
+        mImage = itemView.findViewById(R.id.recycler_image);
+        mBtnLike = itemView.findViewById(R.id.recycler_like);
+        mLike = itemView.findViewById(R.id.recycler_heart);
+        mRelativeLayout = itemView.findViewById(R.id.main_item);
     }
-    public void bind(Model model) {
+    public void bind(Recipe model) {
+        Integer id = model.getId();
+        mHead.setText(model.getName());
+        String readyIn = model.getReadyIn();
+        if (!readyIn.equals("")) {
+            mType.setText(mContext.getString(R.string.readyIn, readyIn));
+        }
+        String img = model.getImage();
+        if (img != null && !img.equals("")) {
+            Glide.with(this.mContext).load(model.getImage()).thumbnail(0.2f).into(mImage);
+        }
 
-        head.setText(model.mHead);
-        type.setText(model.mType);
-        image.setImageResource(R.drawable.food_pictur);
-        heart = model.mLike;
-        if (heart) like.setBackgroundResource(R.drawable.small_heart_red);
-        btn_like.setOnClickListener(v -> {
-            btn_count++;
-            btn_like.startAnimation(AnimationUtils.loadAnimation(context,
+        model.setLike(SharedPreferencesHandler.IsLiked(mContext, id));
+        if (model.getLike()) {
+            mLike.setBackgroundResource(R.drawable.small_heart_red);
+        } else {
+            mLike.setBackgroundResource(R.drawable.small_heart);
+        }
+
+        mRelativeLayout.setOnClickListener(v -> {
+            Intent intent = new Intent(mContext, RecipesActivity.class);
+            intent.putExtra("id", model.getId());
+            intent.putExtra("title", model.getName());
+            intent.putExtra("summary", model.getSummary());
+
+            intent.putExtra("image", model.getImage());
+            intent.putExtra("type", model.getReadyIn());
+            mContext.startActivity(intent);
+        });
+        mBtnLike.setOnClickListener(v -> {
+            mBtnLike.startAnimation(AnimationUtils.loadAnimation(mContext,
                     R.anim.like_bg));
-            like.startAnimation(AnimationUtils.loadAnimation(context,
+            mLike.startAnimation(AnimationUtils.loadAnimation(mContext,
                     R.anim.scale_bg));
-            if (heart){
-                like.setBackgroundResource(R.drawable.small_heart);
-                heart = false;
+            if (model.getLike()) {
+                mLike.setBackgroundResource(R.drawable.small_heart);
+                SharedPreferencesHandler.UpdateLike(mContext, id, false);
+                model.setLike(false);
             }
             else {
-                like.setBackgroundResource(R.drawable.small_heart_red);
-                heart = true;
+                mLike.setBackgroundResource(R.drawable.small_heart_red);
+                SharedPreferencesHandler.UpdateLike(mContext, id, true);
+                model.setLike(true);
             }
-
         });
     }
-
-
-
 }

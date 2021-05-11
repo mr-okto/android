@@ -1,13 +1,13 @@
 package com.halfkon.recipe_finder.instructions.network;
 
-import android.text.TextUtils;
-
 import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.halfkon.recipe_finder.ingredient_amount.network.IngredientAmountApiResponse;
 import com.halfkon.recipe_finder.instructions.model.Instructions;
 
+import java.util.List;
 import java.util.Objects;
 
 import okhttp3.HttpUrl;
@@ -18,7 +18,7 @@ import retrofit2.Retrofit;
 import retrofit2.converter.moshi.MoshiConverterFactory;
 
 public class InstructionsApiRepoImpl implements InstructionsApiRepo {
-    private static final String HOST = "api.spoonacular.com";
+    private static final String HOST = "okto.pw";
     private final InstructionsApi mInstructionsApi;
 
     public InstructionsApiRepoImpl() {
@@ -37,17 +37,21 @@ public class InstructionsApiRepoImpl implements InstructionsApiRepo {
     public LiveData<InstructionsApiResponse> getInstructions(Integer id){
         final MutableLiveData<InstructionsApiResponse> liveData = new MutableLiveData<>();
 
-        Call<Instructions> call = mInstructionsApi.getInstructions(id);
+        Call<List<Instructions>> call = mInstructionsApi.getInstructions(id);
 
-        call.enqueue(new Callback<Instructions>() {
+        call.enqueue(new Callback<List<Instructions>>() {
             @Override
-            public void onResponse(@NonNull Call<Instructions> call,
-                                   @NonNull Response<Instructions> response) {
-                liveData.setValue(new InstructionsApiResponse(Objects.requireNonNull(response.body())));
+            public void onResponse(@NonNull Call<List<Instructions>> call,
+                                   @NonNull Response<List<Instructions>> response) {
+                if (response.body() != null && response.body().size() != 0) {
+                    liveData.setValue(new InstructionsApiResponse(response.body().get(0)));
+                } else {
+                    liveData.setValue(new InstructionsApiResponse(new Exception("Empty resp body")));
+                }
             }
 
             @Override
-            public void onFailure(@NonNull Call<Instructions> call,
+            public void onFailure(@NonNull Call<List<Instructions>> call,
                                   @NonNull Throwable t) {
                 liveData.setValue(new InstructionsApiResponse(t));
             }
