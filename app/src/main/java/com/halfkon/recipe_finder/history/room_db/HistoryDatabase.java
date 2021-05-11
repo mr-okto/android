@@ -9,7 +9,7 @@ import android.content.Context;
 import com.halfkon.recipe_finder.history.HistoryRecordDao;
 
 /**
- * The Room database that contains the Users table
+ * The Room database that contains the History table
  */
 @Database(entities = {HistoryRecord.class}, version = 2)
 public abstract class HistoryDatabase extends RoomDatabase {
